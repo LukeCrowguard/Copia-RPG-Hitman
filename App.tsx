@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mission, TeamLoadout, SimulationResult, Item } from './types';
-import { DEFAULT_LOADOUT, AudioTrack, PISTOLS, GEAR, SUITS, SNIPERS } from './constants';
-import { generateMission, simulateMission } from './services/geminiService';
-import { saveState, loadState, saveEmergencyBackup, AppState } from './services/persistence';
-import BriefingView from './components/BriefingView';
-import PlanningView from './components/PlanningView';
-import SimulationView from './components/SimulationView';
-import TacticalMap from './components/TacticalMap';
-import AudioPlayer from './components/AudioPlayer';
-import ToolsOverlay from './components/ToolsOverlay';
+import { Mission, TeamLoadout, SimulationResult, Item } from './types.ts';
+import { DEFAULT_LOADOUT, AudioTrack, PISTOLS, GEAR, SUITS, SNIPERS } from './constants.ts';
+import { generateMission, simulateMission } from './services/geminiService.ts';
+import { saveState, loadState, saveEmergencyBackup, AppState } from './services/persistence.ts';
+import BriefingView from './components/BriefingView.tsx';
+import PlanningView from './components/PlanningView.tsx';
+import SimulationView from './components/SimulationView.tsx';
+import TacticalMap from './components/TacticalMap.tsx';
+import AudioPlayer from './components/AudioPlayer.tsx';
+import ToolsOverlay from './components/ToolsOverlay.tsx';
 import { LayoutDashboard, Map, FileText, Save, FileCheck, CheckCircle2, AlertOctagon, Server } from 'lucide-react';
 
 type ViewState = 'BRIEFING' | 'PLANNING' | 'SIMULATION' | 'TACTICAL';
@@ -21,12 +21,10 @@ const App: React.FC = () => {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   
-  // Persisted state
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [notes, setNotes] = useState('');
   const [mapImage, setMapImage] = useState<string | null>(null);
   
-  // New States for Customization
   const [inventory, setInventory] = useState<Item[]>([...SUITS, ...PISTOLS, ...GEAR, ...SNIPERS]);
   const [audioTabNames, setAudioTabNames] = useState<Record<string, string>>({
       'AMBIENCE': 'Ambiente',
@@ -39,7 +37,6 @@ const App: React.FC = () => {
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const initialLoadDone = useRef(false);
 
-  // Reference to current state for Event Listeners (avoids closure staleness)
   const stateRef = useRef<AppState>({
       mission: null,
       loadout: DEFAULT_LOADOUT,
@@ -52,7 +49,6 @@ const App: React.FC = () => {
       audioTabNames: {}
   });
 
-  // Keep ref updated
   useEffect(() => {
       stateRef.current = {
           mission,
@@ -67,7 +63,6 @@ const App: React.FC = () => {
       };
   }, [mission, loadout, result, view, notes, mapImage, tracks, inventory, audioTabNames]);
 
-  // Load state on mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -87,7 +82,6 @@ const App: React.FC = () => {
 
   const applyState = (state: AppState) => {
     if (state.mission) {
-        // Migration check
         const m = state.mission as any;
         if (!m.targets && m.targetName) {
             m.targets = [{
@@ -101,7 +95,6 @@ const App: React.FC = () => {
         setMission(m as Mission);
     }
 
-    // MIGRATION: Check if loadout is old style (single agent) or new style (team)
     if (state.loadout) {
         const loadedLoadout = state.loadout as any;
         if (!loadedLoadout.agent404 && loadedLoadout.suit) {
@@ -129,10 +122,8 @@ const App: React.FC = () => {
       setTimeout(() => setNotification(null), 3000);
   };
 
-  // Centralized Save Function (Async / IndexedDB)
   const performSave = async (silent = false) => {
       if (!initialLoadDone.current) return;
-      
       setSaving(true);
       try {
         await saveState(stateRef.current);
@@ -144,28 +135,22 @@ const App: React.FC = () => {
       }
   };
 
-  // Autosave effect (Debounced) - 1s
   useEffect(() => {
     if (!initialLoadDone.current) return;
-
     const timeout = setTimeout(() => {
-      performSave(true); // Silent autosave to IDB
+      performSave(true);
     }, 1000); 
-
     return () => clearTimeout(timeout);
   }, [mission, loadout, result, view, notes, mapImage, tracks, inventory, audioTabNames]);
 
-  // Critical Emergency Save (Synchronous / LocalStorage)
   useEffect(() => {
     const handleUnload = () => {
         if (initialLoadDone.current) {
             saveEmergencyBackup(stateRef.current);
         }
     };
-
     window.addEventListener('pagehide', handleUnload);
     window.addEventListener('beforeunload', handleUnload);
-    
     return () => {
         window.removeEventListener('pagehide', handleUnload);
         window.removeEventListener('beforeunload', handleUnload);
@@ -280,76 +265,32 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen bg-black text-gray-100 flex font-sans overflow-hidden selection:bg-ica-red selection:text-white relative">
-      
       {notification && (
           <div className={`absolute top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded shadow-[0_0_20px_rgba(0,0,0,0.8)] border flex items-center space-x-3 animate-in slide-in-from-top-4 duration-300 ${notification.type === 'success' ? 'bg-green-900/90 border-green-500 text-green-100' : 'bg-red-900/90 border-red-500 text-red-100'}`}>
               {notification.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertOctagon className="w-5 h-5" />}
               <span className="text-sm font-bold uppercase tracking-widest">{notification.message}</span>
           </div>
       )}
-
-      {/* Sidebar Navigation */}
       <aside className="w-16 md:w-20 bg-[#0a0a0a] border-r border-gray-800 flex flex-col items-center py-6 z-20 shrink-0">
-         <div className="w-10 h-10 bg-ica-red flex items-center justify-center font-bold text-white mb-8 shadow-[0_0_15px_rgba(255,0,60,0.5)]">
-            ICA
-         </div>
-
+         <div className="w-10 h-10 bg-ica-red flex items-center justify-center font-bold text-white mb-8 shadow-[0_0_15px_rgba(255,0,60,0.5)]">ICA</div>
          <nav className="flex-1 space-y-6 w-full flex flex-col items-center">
-            <NavButton 
-              active={view === 'BRIEFING'} 
-              onClick={() => setView('BRIEFING')} 
-              icon={FileText} 
-              label="Intel" 
-            />
-            <NavButton 
-              active={view === 'TACTICAL'} 
-              onClick={() => setView('TACTICAL')} 
-              icon={Map} 
-              label="Tático" 
-            />
-            <NavButton 
-              active={view === 'PLANNING'} 
-              onClick={() => setView('PLANNING')} 
-              icon={LayoutDashboard} 
-              label="Prep" 
-              disabled={!mission}
-            />
-            <NavButton 
-              active={view === 'SIMULATION'} 
-              onClick={() => setView('SIMULATION')} 
-              icon={FileCheck} 
-              label="Relatório" 
-              disabled={!result}
-            />
+            <NavButton active={view === 'BRIEFING'} onClick={() => setView('BRIEFING')} icon={FileText} label="Intel" />
+            <NavButton active={view === 'TACTICAL'} onClick={() => setView('TACTICAL')} icon={Map} label="Tático" />
+            <NavButton active={view === 'PLANNING'} onClick={() => setView('PLANNING')} icon={LayoutDashboard} label="Prep" disabled={!mission} />
+            <NavButton active={view === 'SIMULATION'} onClick={() => setView('SIMULATION')} icon={FileCheck} label="Relatório" disabled={!result} />
          </nav>
-
          <div className="mt-auto mb-6 w-full flex flex-col items-center">
-            {/* Status Indicator for GitHub Pages compatibility */}
             <div className="mb-4 flex flex-col items-center opacity-40">
                 <Server className="w-4 h-4 text-green-500 mb-1" />
                 <span className="text-[7px] font-mono uppercase text-center leading-tight">Link: GH_PAGES<br/>STATIC_NODE</span>
             </div>
-
-            <button
-               onClick={handleManualSave}
-               disabled={saving}
-               className={`
-                 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border
-                 ${saving 
-                    ? 'bg-ica-red/10 border-ica-red text-ica-red shadow-[0_0_15px_rgba(255,0,60,0.5)]' 
-                    : 'bg-transparent border-gray-700 text-gray-500 hover:text-white hover:border-white hover:bg-gray-800'}
-               `}
-               title="Salvar Agora"
-            >
+            <button onClick={handleManualSave} disabled={saving} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border ${saving ? 'bg-ica-red/10 border-ica-red text-ica-red shadow-[0_0_15px_rgba(255,0,60,0.5)]' : 'bg-transparent border-gray-700 text-gray-500 hover:text-white hover:border-white hover:bg-gray-800'}`} title="Salvar Agora">
                <Save className={`w-5 h-5 ${saving ? 'animate-pulse' : ''}`} />
             </button>
             <span className="text-[9px] text-gray-600 mt-2 uppercase tracking-widest">{saving ? '...' : 'SALVAR'}</span>
          </div>
       </aside>
-
-      {/* Main Content & Audio Wrapper */}
       <div className="flex-1 flex flex-col h-full relative bg-hex-pattern bg-repeat">
-        
         <header className="h-14 border-b border-gray-800 bg-black/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
            <h1 className="text-xl font-bold uppercase tracking-widest text-white flex items-center">
               <span className="text-ica-red mr-3">//</span>
@@ -363,43 +304,18 @@ const App: React.FC = () => {
               <div className="text-xs font-mono text-gray-600 hidden md:block">SECURE_CONNECTION_ESTABLISHED</div>
            </div>
         </header>
-
         <main className="flex-1 relative overflow-hidden">
           {renderContent()}
         </main>
-
-        <AudioPlayer 
-            tracks={tracks} 
-            onAddTrack={handleAddTrack}
-            onRemoveTrack={handleRemoveTrack}
-            categoryNames={audioTabNames}
-            onUpdateCategoryName={handleUpdateCategoryName}
-        />
-        
-        <ToolsOverlay 
-            notes={notes} 
-            onNotesChange={setNotes} 
-            onImportState={(newState) => {
-                applyState(newState);
-                showNotification("Dossiê Importado com Sucesso", "success");
-            }}
-            currentState={stateRef.current}
-        />
+        <AudioPlayer tracks={tracks} onAddTrack={handleAddTrack} onRemoveTrack={handleRemoveTrack} categoryNames={audioTabNames} onUpdateCategoryName={handleUpdateCategoryName} />
+        <ToolsOverlay notes={notes} onNotesChange={setNotes} onImportState={(newState) => { applyState(newState); showNotification("Dossiê Importado com Sucesso", "success"); }} currentState={stateRef.current} />
       </div>
     </div>
   );
 };
 
 const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ElementType; label: string; disabled?: boolean }> = ({ active, onClick, icon: Icon, label, disabled }) => (
-  <button 
-    onClick={onClick}
-    disabled={disabled}
-    className={`
-      group relative w-full flex flex-col items-center justify-center py-2 transition-all
-      ${active ? 'text-ica-red' : 'text-gray-500 hover:text-white'}
-      ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
-    `}
-  >
+  <button onClick={onClick} disabled={disabled} className={`group relative w-full flex flex-col items-center justify-center py-2 transition-all ${active ? 'text-ica-red' : 'text-gray-500 hover:text-white'} ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
     <div className={`absolute left-0 w-1 h-8 bg-ica-red transition-all duration-300 ${active ? 'opacity-100' : 'opacity-0'}`}></div>
     <Icon className={`w-6 h-6 mb-1 transition-transform group-hover:scale-110 ${active ? 'fill-current' : ''}`} />
     <span className="text-[9px] uppercase tracking-widest font-bold hidden md:block">{label}</span>
